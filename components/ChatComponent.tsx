@@ -6,8 +6,6 @@ const ChatComponent = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
-  const [isThinking, setIsThinking] = useState(false);
-  const [thinkingContent, setThinkingContent] = useState("");
 
   const getResponse = async () => {
     try {
@@ -32,8 +30,7 @@ const ChatComponent = () => {
   const getStreamResponse = async () => {
     try {
       setResponse("");
-      setThinkingContent("");
-      setIsThinking(false);
+
       setLoading(true);
 
       const response = await fetch("/api/chat/stream-response", {
@@ -44,92 +41,24 @@ const ChatComponent = () => {
         body: JSON.stringify({ message }),
       });
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        setLoading(false);
-        return;
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to connect to streaming API");
       }
-
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-      let insideThinkTag = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          setLoading(false);
-          setIsThinking(false);
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-
-        // Process the buffer to separate thinking content from response
-        while (true) {
-          if (!insideThinkTag) {
-            const thinkStart = buffer.indexOf("<think>");
-            if (thinkStart !== -1) {
-              // Add content before <think> to response
-              if (thinkStart > 0) {
-                setResponse((prev) => prev + buffer.substring(0, thinkStart));
-              }
-              buffer = buffer.substring(thinkStart + 7); // Remove "<think>"
-              insideThinkTag = true;
-              setIsThinking(true);
-            } else {
-              // No <think> tag found, check if we might get one in the next chunk
-              const partialTag = buffer.match(/<think?$/);
-              if (partialTag) {
-                // Keep potential partial tag in buffer
-                const safeContent = buffer.substring(0, partialTag.index);
-                if (safeContent) {
-                  setResponse((prev) => prev + safeContent);
-                }
-                buffer = buffer.substring(partialTag.index!);
-                break;
-              } else {
-                // Add all to response
-                setResponse((prev) => prev + buffer);
-                buffer = "";
-                break;
-              }
-            }
-          } else {
-            const thinkEnd = buffer.indexOf("</think>");
-            if (thinkEnd !== -1) {
-              // Add thinking content
-              setThinkingContent(
-                (prev) => prev + buffer.substring(0, thinkEnd)
-              );
-              buffer = buffer.substring(thinkEnd + 8); // Remove "</think>"
-              insideThinkTag = false;
-              setIsThinking(false);
-            } else {
-              // Still inside thinking tag, check for partial closing tag
-              const partialTag = buffer.match(/<\/think?$/);
-              if (partialTag) {
-                const safeContent = buffer.substring(0, partialTag.index);
-                if (safeContent) {
-                  setThinkingContent((prev) => prev + safeContent);
-                }
-                buffer = buffer.substring(partialTag.index!);
-                break;
-              } else {
-                // Add all to thinking content
-                setThinkingContent((prev) => prev + buffer);
-                buffer = "";
-                break;
-              }
-            }
-          }
-        }
+      let done = false;
+      let fullResponse = "";
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value);
+        fullResponse += chunkValue;
+        setResponse(fullResponse);
       }
     } catch (error) {
-      console.error("Error fetching response:", error);
+      console.error("Error fetching stream response:", error);
     } finally {
       setLoading(false);
-      setIsThinking(false);
     }
   };
 
@@ -156,22 +85,12 @@ const ChatComponent = () => {
         </button>
       </div>
 
-      {loading && <p className="mt-4">Loading...</p>}
-
-      {isThinking && (
-        <div className="mt-4 p-4 border border-yellow-300 rounded-md bg-yellow-50">
-          <p className="font-semibold italic text-yellow-700">
-            AI is thinking...
-          </p>
-          <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
-            {thinkingContent}
-          </p>
-        </div>
-      )}
-
       <div className="mt-4 p-4 border border-gray-300 rounded-md bg-gray-50">
         <p className="font-semibold mb-2">Response:</p>
-        <div className="whitespace-pre-wrap">{response}</div>
+        <div className="whitespace-pre-wrap">
+          {response}
+          {loading && <span className="animate-pulse">...</span>}
+        </div>
       </div>
     </>
   );
