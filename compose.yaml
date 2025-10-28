@@ -13,7 +13,7 @@ services:
       context: .
     environment:
       NODE_ENV: production
-      OPENROUTER_API_KEY: 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
+      OPENROUTER_API_KEY: my-key
     ports:
       - 3000:3000
 
