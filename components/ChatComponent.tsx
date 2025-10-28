@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 const ChatComponent = () => {
   const [loading, setLoading] = useState(false);
@@ -89,7 +89,19 @@ const ChatComponent = () => {
         <p className="font-semibold mb-2">Response:</p>
         <div className="whitespace-pre-wrap">
           {response}
-          {loading && <span className="animate-pulse">...</span>}
+          {loading && (
+            <span className="inline-flex items-center space-x-2" aria-hidden>
+              <span className="w-6 h-6 bg-gray-400 rounded-full animate-pulse" />
+              <span
+                className="w-6 h-6 bg-gray-400 rounded-full animate-pulse"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-6 h-6 bg-gray-400 rounded-full animate-pulse"
+                style={{ animationDelay: "300ms" }}
+              />
+            </span>
+          )}
         </div>
       </div>
     </>
